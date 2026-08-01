@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Moi truong ao
+venv/
+.venv/
+env/
+
+# Du lieu dau vao / dau ra cua pipeline (chi luu thu muc, bo qua noi dung)
+input/*
+!input/_README.txt
+output/*
+!output/.gitkeep
+
+# Cac thu muc ket qua cua cac script cu
+ocr_outputs/
+layouts_outputs/
+table_markdown_outputs/
+
+# Du lieu test / mau cuc bo
+inp/
+thiep.jpg
+
+# Log
+log/*.log
+
+# File tam khac
+excalidraw.log
+
+# He dieu hanh / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

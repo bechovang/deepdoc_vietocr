@@ -113,6 +113,74 @@ options:
                         Ngưỡng để lọc ra các phát hiện. Mặc định: 0.5
   --mode {layout,tsr}   Chế độ tác vụ: nhận dạng bố cục (layout) hoặc nhận dạng cấu trúc bảng (tsr)
 ```
+### 3.0. Pipeline PDF → TXT (khuyên dùng)
+
+Đây là cách đơn giản và nhanh nhất để chuyển một loạt file PDF (hoặc ảnh) thành file text tiếng Việt. So với `t_ocr.py` (mục 3.1), pipeline này được thiết kế gọn và thân thiện hơn:
+
+- **Chỉ xuất TXT** — không sinh ảnh debug thừa.
+- **Gộp các trang PDF thành 1 file `.txt`** (mỗi PDF → 1 TXT), các trang ngăn cách bằng `===== Trang i/N =====`.
+- **In tiến độ ra màn hình** từng trang kèm thời gian ước tính còn lại (ETA).
+- **Xử lý streaming từng trang** → không bị treo do hết RAM với PDF dày/nặng.
+- **Ghi tăng dần**: nếu dừng giữa chừng (Ctrl+C), phần đã OCR vẫn được lưu vào file.
+
+#### Cách dùng nhanh (Windows)
+
+1. Copy các file PDF (hoặc ảnh) cần OCR vào thư mục **`input/`** (ở thư mục gốc dự án).
+2. Double-click **`run.bat`** (hoặc chạy trong Command Prompt).
+3. Mỗi file ra **1 file `.txt` cùng tên** trong thư mục **`output/`**.
+
+```
+deepdoc_vietocr/
+├── input/          ← bỏ PDF / ảnh vào đây
+│   └── tai-lieu.pdf
+├── output/         ← kết quả TXT ra đây
+│   └── tai-lieu.txt
+├── pdf_to_txt.py   ← script pipeline
+└── run.bat         ← double-click để chạy (Windows)
+```
+
+#### Chạy bằng dòng lệnh
+
+```bash
+python pdf_to_txt.py --inputs ./input --output_dir ./output
+```
+
+#### Tham số
+
+| Tham số | Mặc định | Mô tả |
+|---------|----------|-------|
+| `--inputs` | `./input` | Thư mục chứa file PDF/ảnh đầu vào |
+| `--output_dir` | `./output` | Thư mục lưu file TXT kết quả |
+| `--zoomin` | `3` | Độ phân giải render PDF (72 × zoomin DPI). Tự động giảm với trang quá to để tiết kiệm RAM. |
+| `--limit` | (không giới hạn) | Chỉ OCR N trang đầu của mỗi PDF — hữu ích để xem thử file dày |
+
+Ví dụ xem thử 5 trang đầu của một PDF dày:
+```bash
+python pdf_to_txt.py --inputs ./input --limit 5
+```
+
+#### Định dạng hỗ trợ
+
+- **PDF:** `.pdf`
+- **Ảnh:** `.jpg`, `.jpeg`, `.png`, `.tif`, `.tiff`, `.bmp`, `.gif`, `.webp`
+
+#### Xử lý PDF nhiều trang / dung lượng lớn
+
+Pipeline render và OCR **từng trang một** (chỉ giữ một trang trong RAM tại một thời điểm), nên có thể xử lý PDF hàng trăm trang mà không bị treo. Độ phân giải render được **tự động giới hạn** ở mức hợp lý (model OCR vốn downscale về 960px, nên render siêu cao chỉ làm tốn RAM mà không tăng độ chính xác). Trong quá trình chạy, màn hình sẽ in tiến độ dạng:
+
+```
+[1/1] tai-lieu.pdf
+    - OCR trang 5/439 xong  (8s da qua, con lai ~250s)
+```
+
+Cần dừng sớm thì nhấn **Ctrl+C** — phần đã OCR sẽ được lưu ngay vào file TXT.
+
+#### Ghi chú
+
+- Mặc định chạy trên **CPU**, nhận dạng bằng **VietOCR Seq2seq**. Muốn đổi sang Transformer/ONNX thì chỉnh trong `module/ocr.py` (xem mục 3.1).
+- `run.bat` tự dùng `venv` (nếu có); không cần kích hoạt môi trường ảo bằng tay.
+- Dữ liệu trong `input/` và `output/` mặc định bị `.gitignore` bỏ qua (chỉ track thư mục).
+
 ### 3.1. OCR
 Để chạy thử OCR, bạn có thể sử dụng lệnh sau:
  ```bash

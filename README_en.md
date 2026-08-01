@@ -109,6 +109,74 @@ options:
                         Threshold for filtering detections. Default: 0.5
   --mode {layout,tsr}   Task mode: layout recognizer (layout) or table structure recognizer (tsr)
 ```
+### 3.0. PDF → TXT Pipeline (recommended)
+
+This is the simplest and fastest way to convert a batch of PDF files (or images) into Vietnamese text. Compared to `t_ocr.py` (section 3.1), this pipeline is more compact and user-friendly:
+
+- **Outputs TXT only** — no extra debug images.
+- **Merges PDF pages into a single `.txt`** (one PDF → one TXT); pages are separated by `===== Trang i/N =====`.
+- **Prints per-page progress** to the console with an estimated time remaining (ETA).
+- **Streams pages one by one** → no out-of-memory crashes on long/heavy PDFs.
+- **Incremental writes**: if you stop mid-run (Ctrl+C), everything OCR'd so far is still saved.
+
+#### Quick start (Windows)
+
+1. Copy the PDF (or image) files you want to OCR into the **`input/`** folder (at the project root).
+2. Double-click **`run.bat`** (or run it from Command Prompt).
+3. Each file produces **one `.txt` file with the same name** in the **`output/`** folder.
+
+```
+deepdoc_vietocr/
+├── input/          <- put PDF / images here
+│   └── document.pdf
+├── output/         <- TXT results appear here
+│   └── document.txt
+├── pdf_to_txt.py   <- pipeline script
+└── run.bat         <- double-click to run (Windows)
+```
+
+#### Run from the command line
+
+```bash
+python pdf_to_txt.py --inputs ./input --output_dir ./output
+```
+
+#### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--inputs` | `./input` | Directory containing input PDF/image files |
+| `--output_dir` | `./output` | Directory to store output TXT files |
+| `--zoomin` | `3` | PDF render resolution (72 × zoomin DPI). Automatically reduced for oversized pages to save RAM. |
+| `--limit` | (no limit) | OCR only the first N pages of each PDF — useful for previewing large files |
+
+Example: preview the first 5 pages of a long PDF:
+```bash
+python pdf_to_txt.py --inputs ./input --limit 5
+```
+
+#### Supported formats
+
+- **PDF:** `.pdf`
+- **Images:** `.jpg`, `.jpeg`, `.png`, `.tif`, `.tiff`, `.bmp`, `.gif`, `.webp`
+
+#### Handling large / multi-page PDFs
+
+The pipeline renders and OCRs **one page at a time** (only one page is kept in memory), so it can process PDFs with hundreds of pages without freezing. The render resolution is **automatically capped** to a sensible level (the OCR model already downscales to 960px, so rendering at very high resolution just wastes RAM without improving accuracy). During the run, progress is printed like this:
+
+```
+[1/1] document.pdf
+    - OCR trang 5/439 xong  (8s da qua, con lai ~250s)
+```
+
+Press **Ctrl+C** to stop early — everything OCR'd so far is saved to the TXT file immediately.
+
+#### Notes
+
+- Runs on **CPU** by default, recognizing with **VietOCR Seq2seq**. To switch to the Transformer/ONNX variant, edit `module/ocr.py` (see section 3.1).
+- `run.bat` automatically uses `venv` if present; no need to activate the virtual environment manually.
+- Contents of `input/` and `output/` are ignored by `.gitignore` by default (only the folders are tracked).
+
 ### 3.1. OCR
 To test OCR, you can use the following command:
  ```bash
