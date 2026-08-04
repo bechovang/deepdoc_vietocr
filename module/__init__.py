@@ -40,8 +40,11 @@ def init_in_out(args):
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
 
-    def pdf_pages(fnm, zoomin=3):
+    def pdf_pages(fnm, zoomin=None):
         nonlocal outputs, images
+        # Cho phep lay zoomin tu args (full_pipeline.py) hoac dung mac dinh
+        if zoomin is None:
+            zoomin = getattr(args, 'zoomin', 5)
         with sys.modules[LOCK_KEY_pdfplumber]:
             pdf = pdfplumber.open(fnm)
             images = [p.to_image(resolution=72 * zoomin).annotated for i, p in

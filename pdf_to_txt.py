@@ -39,7 +39,7 @@ PDF_EXT = '.pdf'
 _PDF_LOCK = threading.Lock()
 
 
-def page_resolution(page, zoomin, max_long_edge=2500):
+def page_resolution(page, zoomin, max_long_edge=4000):
     """
     Tinh do phan giai (DPI) cho 1 trang.
     - zoomin: DPI mong muon = 72 * zoomin (vi du zoomin=3 -> 216 DPI).
@@ -148,8 +148,8 @@ def main():
                         help='Thu muc chua file PDF/anh dau vao. Mac dinh: ./input')
     parser.add_argument('--output_dir', default='./output',
                         help='Thu muc luu file TXT. Mac dinh: ./output')
-    parser.add_argument('--zoomin', type=int, default=3,
-                        help='Do phan giai khi render PDF (72*zoomin DPI). Mac dinh: 3 (=216 DPI). '
+    parser.add_argument('--zoomin', type=int, default=5,
+                        help='Do phan giai khi render PDF (72*zoomin DPI). Mac dinh: 5 (=360 DPI). '
                              'Tu dong giam xuong voi trang qua to de tiet kiem RAM.')
     parser.add_argument('--limit', type=int, default=None,
                         help='Chi OCR N trang dau tien cua moi PDF (dung de xem thu voi file lon).')

@@ -27,6 +27,9 @@ thiep.jpg
 # Log
 log/*.log
 
+# Ghi nho ca nhan (pi-memory-md)
+memory/
+
 # File tam khac
 excalidraw.log
 

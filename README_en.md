@@ -147,7 +147,7 @@ python pdf_to_txt.py --inputs ./input --output_dir ./output
 |--------|---------|-------------|
 | `--inputs` | `./input` | Directory containing input PDF/image files |
 | `--output_dir` | `./output` | Directory to store output TXT files |
-| `--zoomin` | `3` | PDF render resolution (72 × zoomin DPI). Automatically reduced for oversized pages to save RAM. |
+| `--zoomin` | `6` | PDF render resolution (72 × zoomin DPI). Automatically reduced for oversized pages to save RAM. |
 | `--limit` | (no limit) | OCR only the first N pages of each PDF — useful for previewing large files |
 
 Example: preview the first 5 pages of a long PDF:
@@ -209,6 +209,38 @@ The input can be a directory containing images or PDFs, or a single image or PDF
 <div align="center" style="margin-top:20px;margin-bottom:20px;">
 <img src="img\Screenshot 2025-08-28 182132.png" width="1000"/>
 </div>
+
+### 3.4. Full Pipeline — Layout + Table + Equation
+
+A comprehensive pipeline that combines DeepDoc's full capabilities: layout recognition, table extraction (markdown), and mathematical equation recognition (LaTeX) in a single run.
+
+```bash
+python full_pipeline.py --inputs=path_to_images_or_pdfs --output_dir=./output --threshold=0.5
+```
+
+The input can be a directory containing images or PDFs. The output is a `.md` file containing:
+- **OCR text** from non-table/non-equation regions
+- **Tables** extracted as markdown (preserving column/row structure)
+- **Math equations** recognized as LaTeX code (`$$...$$`)
+
+#### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--inputs` | (required) | Directory containing input PDF/image files |
+| `--output_dir` | `./table_markdown_outputs` | Directory to store output markdown files |
+| `--threshold` | `0.5` | Detection confidence threshold |
+| `--zoomin` | `6` | PDF render resolution (72 × zoomin DPI) |
+
+#### Additional requirement (for equation recognition)
+
+When processing documents with math equations, the pipeline requires **pix2tex**:
+
+```bash
+pip install pix2tex
+```
+
+If `pix2tex` is not installed, the pipeline still runs but equation regions will be skipped (outputting `_(equation)_`).
 
 ## Conclusion
 I hope you find this tool useful and applicable in practice. If you have any feedback, please leave it in the comments below. Thank you for reading!

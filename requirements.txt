@@ -11,3 +11,4 @@ pyclipper
 ruamel.yaml
 cachetools
 six
+pix2tex  # Equation OCR (LaTeX-OCR). Required by full_pipeline.py for math formula recognition

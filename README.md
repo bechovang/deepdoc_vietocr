@@ -151,7 +151,7 @@ python pdf_to_txt.py --inputs ./input --output_dir ./output
 |---------|----------|-------|
 | `--inputs` | `./input` | Thư mục chứa file PDF/ảnh đầu vào |
 | `--output_dir` | `./output` | Thư mục lưu file TXT kết quả |
-| `--zoomin` | `3` | Độ phân giải render PDF (72 × zoomin DPI). Tự động giảm với trang quá to để tiết kiệm RAM. |
+| `--zoomin` | `6` | Độ phân giải render PDF (72 × zoomin DPI). Tự động giảm với trang quá to để tiết kiệm RAM. |
 | `--limit` | (không giới hạn) | Chỉ OCR N trang đầu của mỗi PDF — hữu ích để xem thử file dày |
 
 Ví dụ xem thử 5 trang đầu của một PDF dày:
@@ -213,6 +213,38 @@ python t_recognizer.py --inputs=path_to_images_or_pdfs --threshold=0.2 --mode=ts
 <div align="center" style="margin-top:20px;margin-bottom:20px;">
 <img src="img\Screenshot 2025-08-28 182132.png" width="1000"/>
 </div>
+
+### 3.4. Full Pipeline — Layout + Table + Equation
+
+Pipeline tổng hợp kết hợp toàn bộ khả năng của DeepDoc: nhận diện bố cục (layout), trích xuất bảng (table markdown) và nhận dạng công thức toán học (LaTeX) chỉ trong một lần chạy.
+
+```bash
+python full_pipeline.py --inputs=path_to_images_or_pdfs --output_dir=./output --threshold=0.5
+```
+
+Đầu vào có thể là thư mục chứa hình ảnh hoặc PDF. Đầu ra là file `.md` với nội dung gồm:
+- **Văn bản OCR** từ các vùng không phải bảng/công thức
+- **Bảng** được trích xuất dưới dạng markdown (giữ nguyên cấu trúc cột/hàng)
+- **Công thức toán** được nhận dạng thành mã LaTeX (`$$...$$`)
+
+#### Tham số
+
+| Tham số | Mặc định | Mô tả |
+|---------|----------|-------|
+| `--inputs` | (bắt buộc) | Thư mục chứa file PDF/ảnh đầu vào |
+| `--output_dir` | `./table_markdown_outputs` | Thư mục lưu file markdown kết quả |
+| `--threshold` | `0.5` | Ngưỡng lọc phát hiện layout |
+| `--zoomin` | `6` | Độ phân giải render PDF (72 × zoomin DPI) |
+
+#### Yêu cầu bổ sung (cho nhận dạng công thức)
+
+Khi xử lý tài liệu có công thức toán, pipeline cần thêm gói **pix2tex**:
+
+```bash
+pip install pix2tex
+```
+
+Nếu chưa cài `pix2tex`, pipeline vẫn chạy được nhưng vùng công thức sẽ bị bỏ qua (ghi là `_(equation)_`).
 
 ## Kết
 Hy vọng các bạn thấy công cụ hữu ích và áp dụng được vào thực tế. Nếu có góp ý hãy để lại dưới phần bình luận. Cảm ơn các bạn đã đọc bài viết! 

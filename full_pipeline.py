@@ -16,6 +16,7 @@ sys.path.insert(
 
 from module.ocr import OCR 
 from module import LayoutRecognizer, TableStructureRecognizer, init_in_out
+from equation_mvp.equation_ocr import image_to_latex, crop_equation_region
 
 from datetime import datetime
 
@@ -136,6 +137,16 @@ def main(args):
                 markdown = extract_table_markdown(img, region, ocr)
                 region_and_pos.append((y_pos, markdown))
 
+            if label in ["equation"] and score >= float(args.threshold):
+                print(f"Recognizing equation region: {region}")
+                eq_img = crop_equation_region(img, region)
+                latex_code = image_to_latex(eq_img)
+                if latex_code:
+                    markdown = f"$${latex_code}$$"
+                else:
+                    markdown = "_(equation)_"
+                region_and_pos.append((y_pos, markdown))
+
         # Now OCR any remaining undetected area (including non-table/figure)
         inv_mask = mask.point(lambda p: 1 - p)
         if inv_mask.getbbox():
@@ -167,5 +178,7 @@ if __name__ == "__main__":
     parser.add_argument('--threshold',
                         help="Detection threshold. Default: 0.5",
                         default=0.5)
+    parser.add_argument('--zoomin', type=int, default=5,
+                        help="DPI render PDF (72*zoomin). Mac dinh: 5 (=360 DPI)")
     args = parser.parse_args()
     main(args)
