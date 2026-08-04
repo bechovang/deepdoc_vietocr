@@ -246,6 +246,73 @@ pip install pix2tex
 
 Nếu chưa cài `pix2tex`, pipeline vẫn chạy được nhưng vùng công thức sẽ bị bỏ qua (ghi là `_(equation)_`).
 
+## 4. Build EXE (cho khách hàng)
+
+Để phân phối cho khách không cần cài Python, bạn có thể đóng gói toàn bộ dự án thành thư mục chứa file `.exe` chạy độc lập bằng **PyInstaller**.
+
+### Yêu cầu
+
+- Đã cài đặt đầy đủ dependencies trong `venv`
+- Internet (để pip install PyInstaller nếu chưa có)
+- ~2 GB dung lượng ổ đĩa trống cho quá trình build
+
+### Build 1-click
+
+```bash
+python build_exe.py
+```
+
+Script sẽ tự động:
+1. Cài PyInstaller (nếu chưa có)
+2. Dọn sạch bản build cũ
+3. Đóng gói toàn bộ code + model weights + dependencies
+4. Xuất ra thư mục `dist/DeepDoc_VietOCR/`
+
+Quá trình build mất khoảng **10–30 phút** tùy cấu hình máy.
+
+### Kết quả
+
+Sau khi build, thư mục `dist/DeepDoc_VietOCR/` gồm:
+
+```
+dist/DeepDoc_VietOCR/
+├── DeepDoc_VietOCR.exe    # GUI (không console, double-click)
+├── pdf_to_txt.exe          # CLI (có console, chạy bằng cmd)
+├── _internal/               # Python runtime + dependencies + models
+│   ├── onnx/                # Model weights (~407 MB)
+│   ├── torch/               # PyTorch runtime (da prune CUDA)
+│   ├── onnxruntime/         # ONNX Runtime
+│   └── ...
+├── input/                   # Tao thu muc nay, bo PDF vao
+└── output/                  # Ket qua TXT tu dong vao day
+```
+
+**Tổng dung lượng:** ~1.5–1.8 GB (nén 7-Zip còn ~700–900 MB)
+
+### Cách dùng cho khách
+
+#### GUI (khuyên dùng)
+
+1. Giải nén thư mục `DeepDoc_VietOCR`
+2. Tạo thư mục `input/` (nếu chưa có)
+3. Copy file PDF hoặc ảnh vào `input/`
+4. Double-click **`DeepDoc_VietOCR.exe`**
+5. Trong cửa sổ GUI: bấm **"📂 Thêm file..."** hoặc **"📁 Thêm thư mục..."**
+6. Chọn thư mục output (mặc định `./output`)
+7. Bấm **"▶ Bắt đầu OCR"**
+
+#### CLI
+
+```bash
+pdf_to_txt.exe --inputs ./input --output_dir ./output
+```
+
+### Ghi chú
+
+- File `.exe` đã chạy được ngay trên máy **không cài Python**
+- Có thể nén thư mục `DeepDoc_VietOCR` bằng 7-Zip / WinRAR để gửi cho khách
+- Nếu khách cần xử lý công thức toán, cài thêm `pip install pix2tex` trước khi build (xem mục 3.4)
+
 ## Kết
 Hy vọng các bạn thấy công cụ hữu ích và áp dụng được vào thực tế. Nếu có góp ý hãy để lại dưới phần bình luận. Cảm ơn các bạn đã đọc bài viết! 
 

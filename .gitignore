@@ -30,6 +30,10 @@ log/*.log
 # Ghi nho ca nhan (pi-memory-md)
 memory/
 
+# Build PyInstaller
+build/
+dist/
+
 # File tam khac
 excalidraw.log
 

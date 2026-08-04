@@ -38,7 +38,11 @@ if LOCK_KEY_pdfplumber not in sys.modules:
 
 
 def get_project_base_directory(*args):
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
+    # PyInstaller bundle: khi build, files nam trong sys._MEIPASS
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        base_dir = sys._MEIPASS
+    else:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
     if args:
         return os.path.join(base_dir, *args)
     return base_dir

@@ -242,6 +242,73 @@ pip install pix2tex
 
 If `pix2tex` is not installed, the pipeline still runs but equation regions will be skipped (outputting `_(equation)_`).
 
+## 4. Build EXE (for distribution)
+
+To distribute to clients who don't have Python installed, you can package the entire project into a standalone folder containing `.exe` files using **PyInstaller**.
+
+### Requirements
+
+- All dependencies installed in `venv`
+- Internet connection (to pip install PyInstaller if missing)
+- ~2 GB free disk space for the build process
+
+### One-click build
+
+```bash
+python build_exe.py
+```
+
+The script will automatically:
+1. Install PyInstaller (if not present)
+2. Clean old builds
+3. Package all code + model weights + dependencies
+4. Output to `dist/DeepDoc_VietOCR/`
+
+The build process takes approximately **10–30 minutes** depending on your machine.
+
+### Result
+
+After building, the `dist/DeepDoc_VietOCR/` folder contains:
+
+```
+dist/DeepDoc_VietOCR/
+├── DeepDoc_VietOCR.exe    # GUI (no console, double-click)
+├── pdf_to_txt.exe          # CLI (with console)
+├── _internal/               # Python runtime + dependencies + models
+│   ├── onnx/                # Model weights (~407 MB)
+│   ├── torch/               # PyTorch (CUDA pruned)
+│   ├── onnxruntime/         # ONNX Runtime
+│   └── ...
+├── input/                   # Create this folder, put PDFs here
+└── output/                  # TXT results will appear here
+```
+
+**Total size:** ~1.5–1.8 GB (7-Zip compressed: ~700–900 MB)
+
+### Client usage
+
+#### GUI (recommended)
+
+1. Extract the `DeepDoc_VietOCR` folder
+2. Create an `input/` folder (if not present)
+3. Copy PDF or image files into `input/`
+4. Double-click **`DeepDoc_VietOCR.exe`**
+5. Click **"📂 Thêm file..."** or **"📁 Thêm thư mục..."** to select files
+6. Choose output directory (default `./output`)
+7. Click **"▶ Bắt đầu OCR"**
+
+#### CLI
+
+```bash
+pdf_to_txt.exe --inputs ./input --output_dir ./output
+```
+
+### Notes
+
+- The `.exe` runs on machines **without Python installed**
+- Compress the `DeepDoc_VietOCR` folder with 7-Zip / WinRAR before sending to clients
+- For equation recognition support, install `pip install pix2tex` before building (see section 3.4)
+
 ## Conclusion
 I hope you find this tool useful and applicable in practice. If you have any feedback, please leave it in the comments below. Thank you for reading!
 
