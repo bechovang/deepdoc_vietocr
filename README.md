@@ -141,8 +141,15 @@ deepdoc_vietocr/
 
 #### Chạy bằng dòng lệnh
 
+Lệnh tối giản (dùng cấu hình mặc định):
 ```bash
 python pdf_to_txt.py --inputs ./input --output_dir ./output
+```
+
+Cấu hình **khuyên dùng** cho PDF có text nhỏ/dày (đề thi, giấy tờ scan…). `run.bat` đã áp dụng sẵn cấu hình này — cho ra nhiều chữ hơn và giảm lỗi cắt dòng:
+```bash
+python pdf_to_txt.py --inputs ./input --output_dir ./output \
+    --zoomin 4 --max_long_edge 3400 --det_limit_side 1536
 ```
 
 #### Tham số
@@ -153,6 +160,8 @@ python pdf_to_txt.py --inputs ./input --output_dir ./output
 | `--output_dir` | `./output` | Thư mục lưu file TXT kết quả |
 | `--zoomin` | `6` | Độ phân giải render PDF (72 × zoomin DPI). Tự động giảm với trang quá to để tiết kiệm RAM. |
 | `--limit` | (không giới hạn) | Chỉ OCR N trang đầu của mỗi PDF — hữu ích để xem thử file dày |
+| `--max_long_edge` | `2500` | Cạnh dài tối đa (pixel) khi render PDF; trang to hơn sẽ bị giảm DPI để tiết kiệm RAM. Tăng lên (vd `3400`, `5200`) nếu muốn DPI cao hơn. |
+| `--det_limit_side` | `960` | Cạnh dài tối đa (pixel) ở bước phát hiện text (detector). Tăng lên (vd `1536`) để giảm lỗi cắt dòng ở text nhỏ/dày; đổi lại chậm hơn một chút. |
 
 Ví dụ xem thử 5 trang đầu của một PDF dày:
 ```bash
@@ -166,7 +175,7 @@ python pdf_to_txt.py --inputs ./input --limit 5
 
 #### Xử lý PDF nhiều trang / dung lượng lớn
 
-Pipeline render và OCR **từng trang một** (chỉ giữ một trang trong RAM tại một thời điểm), nên có thể xử lý PDF hàng trăm trang mà không bị treo. Độ phân giải render được **tự động giới hạn** ở mức hợp lý (model OCR vốn downscale về 960px, nên render siêu cao chỉ làm tốn RAM mà không tăng độ chính xác). Trong quá trình chạy, màn hình sẽ in tiến độ dạng:
+Pipeline render và OCR **từng trang một** (chỉ giữ một trang trong RAM tại một thời điểm), nên có thể xử lý PDF hàng trăm trang mà không bị treo. Độ phân giải render được **tự động giới hạn** ở mức hợp lý qua `--max_long_edge` (mặc định 2500px). Lưu ý: render siêu cao thường vô ích — xem phân tích chi tiết ở mục **Hiệu chỉnh chất lượng** bên dưới. Trong quá trình chạy, màn hình sẽ in tiến độ dạng:
 
 ```
 [1/1] tai-lieu.pdf
@@ -180,6 +189,31 @@ Cần dừng sớm thì nhấn **Ctrl+C** — phần đã OCR sẽ được lưu
 - Mặc định chạy trên **CPU**, nhận dạng bằng **VietOCR Seq2seq**. Muốn đổi sang Transformer/ONNX thì chỉnh trong `module/ocr.py` (xem mục 3.1).
 - `run.bat` tự dùng `venv` (nếu có); không cần kích hoạt môi trường ảo bằng tay.
 - Dữ liệu trong `input/` và `output/` mặc định bị `.gitignore` bỏ qua (chỉ track thư mục).
+
+#### Hiệu chỉnh chất lượng (DPI & detector)
+
+Có **hai biến độc lập** quyết định chất lượng OCR — cần hiểu rõ để không tăng DPI vô ích:
+
+1. **DPI render** (`--zoomin`, `--max_long_edge`) — độ phân giải khi raster hóa trang PDF.
+2. **Độ phân giải detector** (`--det_limit_side`) — kích thước (pixel) mà bước phát hiện text downscale về trước khi tìm hộp chữ.
+
+**Khi nào tăng DPI là vô ích?**
+
+- Nếu nội dung PDF là **ảnh raster nhúng** (ví dụ đề thi FuOverflow: mỗi câu hỏi là một ảnh `1920×~720px`, tương đương **271 DPI**), thì render trang ở 432/600/800 DPI **chỉ là upscale** cái ảnh đó — không thêm chi tiết, chỉ tốn RAM và chậm hơn. DPI hiệu dụng bị chốt ở độ phân giải gốc của ảnh.
+- Nếu nội dung là **text vector**, chữ vốn đã sắc ở mọi DPI; ~288 DPI là dư sức. Lỗi lúc này thường do detector cắt hộp chữ quá ngắn (`"MULTIPLE C"` thay vì `"MULTIPLE CHOICE"`), không phải do mờ.
+
+**Cấu hình khuyên dùng** (đã kiểm chứng): `--zoomin 4 --max_long_edge 3400 --det_limit_side 1536`.
+
+Kết quả đo trên một PDF đề thi (120 trang):
+
+| Cấu hình | Số từ | `"MULTIPLE CHOICE"` đầy đủ | Tốc độ |
+|---|---|---|---|
+| 432 DPI + detector 960 (cũ) | 2.723 | 19/60 trang | ~0.45 s/trang |
+| 288 DPI + detector 1536 (mới) | **3.957 (+45%)** | **60/60 trang** | ~0.8 s/trang |
+
+→ Detector 1536 lấy thêm gần 50% chữ và sửa hết lỗi cắt dòng, đổi lại chậm ~1.8×. Nếu cần nhanh hơn, thử `--det_limit_side 1280` (điểm cân bằng).
+
+Nếu sau khi tăng detector mà **vẫn sai chữ ở vùng ảnh 271-DPI** (vd `"lisled"` thay vì `listed`), đó là giới hạn của ảnh gốc — cần nhánh nâng cao riêng (rút ảnh native rồi upscale) chứ không phải tăng DPI trang.
 
 ### 3.1. OCR
 Để chạy thử OCR, bạn có thể sử dụng lệnh sau:

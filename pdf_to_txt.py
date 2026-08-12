@@ -53,7 +53,7 @@ def page_resolution(page, zoomin, max_long_edge=4000):
     return max(resolution, 72.0)  # it nhat 72 DPI
 
 
-def process_pdf_streaming(ocr, pdf_path, out_txt, zoomin, limit=None):
+def process_pdf_streaming(ocr, pdf_path, out_txt, zoomin, limit=None, max_long_edge=2500):
     """
     Render + OCR tung trang va ghi vao file TXT ngay (streaming).
     - Chi giu 1 trang trong RAM tai 1 thoi diem -> khong bi treo voi PDF nhieu trang.
@@ -72,7 +72,7 @@ def process_pdf_streaming(ocr, pdf_path, out_txt, zoomin, limit=None):
                 for pi, page in enumerate(pdf.pages, 1):
                     if limit and pi > limit:
                         break
-                    resolution = page_resolution(page, zoomin)
+                    resolution = page_resolution(page, zoomin, max_long_edge=max_long_edge)
                     img = page.to_image(resolution=resolution).annotated
                     txt = image_to_text(ocr, img)
                     del img  # giai phong anh khoi RAM ngay
@@ -117,7 +117,7 @@ def collect_inputs(input_dir):
     return files
 
 
-def process_file(ocr, fpath, output_dir, zoomin, limit=None):
+def process_file(ocr, fpath, output_dir, zoomin, limit=None, max_long_edge=2500):
     """
     Xu ly 1 file (PDF hoac anh) -> ghi 1 file TXT.
     - PDF: xu ly streaming tung trang (tiet kiem RAM).
@@ -130,7 +130,7 @@ def process_file(ocr, fpath, output_dir, zoomin, limit=None):
     out_txt = os.path.join(output_dir, stem + '.txt')
 
     if ext == PDF_EXT:
-        out_txt, n_pages = process_pdf_streaming(ocr, fpath, out_txt, zoomin, limit)
+        out_txt, n_pages = process_pdf_streaming(ocr, fpath, out_txt, zoomin, limit, max_long_edge=max_long_edge)
     else:
         img = Image.open(fpath).convert('RGB')
         txt = image_to_text(ocr, img)
@@ -153,6 +153,12 @@ def main():
                              'Tu dong giam xuong voi trang qua to de tiet kiem RAM.')
     parser.add_argument('--limit', type=int, default=None,
                         help='Chi OCR N trang dau tien cua moi PDF (dung de xem thu voi file lon).')
+    parser.add_argument('--max_long_edge', type=int, default=2500,
+                        help='Canh dai toi da (pixel) khi render PDF; trang to hon se bi giam DPI '
+                             'de tiet kiem RAM. Mac dinh: 2500. Tang len (vd 5200) neu muon DPI cao hon.')
+    parser.add_argument('--det_limit_side', type=int, default=960,
+                        help='Canh dai toi da (pixel) cua buoc phat hien text (detector). Mac dinh: 960. '
+                             'Tang len (vd 1536) de giam loi cat dong o text nho/day; doi mat cham them.')
     args = parser.parse_args()
 
     input_dir = os.path.abspath(args.inputs)
@@ -185,7 +191,7 @@ def main():
 
     # ---- Nap mo hinh OCR ----
     from module.ocr import OCR   # import sau khi da sua sys.path
-    ocr = OCR()
+    ocr = OCR(det_limit_side_len=args.det_limit_side)
     print('[*] Nap mo hinh xong!\n')
 
     # ---- Xu ly tung file ----
@@ -197,7 +203,8 @@ def main():
         print(f'[{idx}/{len(files)}] {name}')
         t0 = time.time()
         try:
-            out_txt, n_pages = process_file(ocr, fpath, output_dir, args.zoomin, args.limit)
+            out_txt, n_pages = process_file(ocr, fpath, output_dir, args.zoomin, args.limit,
+                                                max_long_edge=args.max_long_edge)
             elapsed = time.time() - t0
             avg = elapsed / n_pages if n_pages else elapsed
             print(f'    -> Da luu: {os.path.basename(out_txt)}  '

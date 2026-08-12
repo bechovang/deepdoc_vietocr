@@ -41,7 +41,9 @@ if %errorlevel% neq 0 (
 
 echo.
 REM Chay pipeline voi output khong dem bo dem (unbuffered) de xem tien trinh truc tiep
-"%PY%" -u pdf_to_txt.py --inputs "./input" --output_dir "./output"
+REM Cau hinh: zoomin 4 (~288 DPI) + det_limit_side 1536 -> giam loi cat dong o text nho.
+REM (Noi dung PDF la anh raster ~271 DPI nen khong can render DPI cao hon.)
+"%PY%" -u pdf_to_txt.py --inputs "./input" --output_dir "./output" --zoomin 4 --max_long_edge 3400 --det_limit_side 1536
 
 echo.
 pause

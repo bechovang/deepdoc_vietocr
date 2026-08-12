@@ -137,8 +137,15 @@ deepdoc_vietocr/
 
 #### Run from the command line
 
+Minimal command (default settings):
 ```bash
 python pdf_to_txt.py --inputs ./input --output_dir ./output
+```
+
+**Recommended** config for PDFs with small/dense text (exams, scanned documents…). `run.bat` already uses this — recovers more text and reduces line truncation:
+```bash
+python pdf_to_txt.py --inputs ./input --output_dir ./output \
+    --zoomin 4 --max_long_edge 3400 --det_limit_side 1536
 ```
 
 #### Options
@@ -149,6 +156,8 @@ python pdf_to_txt.py --inputs ./input --output_dir ./output
 | `--output_dir` | `./output` | Directory to store output TXT files |
 | `--zoomin` | `6` | PDF render resolution (72 × zoomin DPI). Automatically reduced for oversized pages to save RAM. |
 | `--limit` | (no limit) | OCR only the first N pages of each PDF — useful for previewing large files |
+| `--max_long_edge` | `2500` | Maximum long edge (pixels) when rendering a PDF; larger pages are downscaled to save RAM. Increase (e.g. `3400`, `5200`) for higher DPI. |
+| `--det_limit_side` | `960` | Maximum long edge (pixels) at the text-detection step. Increase (e.g. `1536`) to reduce line truncation on small/dense text, at the cost of some speed. |
 
 Example: preview the first 5 pages of a long PDF:
 ```bash
@@ -162,7 +171,7 @@ python pdf_to_txt.py --inputs ./input --limit 5
 
 #### Handling large / multi-page PDFs
 
-The pipeline renders and OCRs **one page at a time** (only one page is kept in memory), so it can process PDFs with hundreds of pages without freezing. The render resolution is **automatically capped** to a sensible level (the OCR model already downscales to 960px, so rendering at very high resolution just wastes RAM without improving accuracy). During the run, progress is printed like this:
+The pipeline renders and OCRs **one page at a time** (only one page is kept in memory), so it can process PDFs with hundreds of pages without freezing. The render resolution is **automatically capped** to a sensible level via `--max_long_edge` (default 2500px). Note that rendering at very high resolution is usually pointless — see **Tuning quality** below. During the run, progress is printed like this:
 
 ```
 [1/1] document.pdf
@@ -176,6 +185,31 @@ Press **Ctrl+C** to stop early — everything OCR'd so far is saved to the TXT f
 - Runs on **CPU** by default, recognizing with **VietOCR Seq2seq**. To switch to the Transformer/ONNX variant, edit `module/ocr.py` (see section 3.1).
 - `run.bat` automatically uses `venv` if present; no need to activate the virtual environment manually.
 - Contents of `input/` and `output/` are ignored by `.gitignore` by default (only the folders are tracked).
+
+#### Tuning quality (DPI & detector)
+
+OCR quality is governed by **two independent knobs** — understand them to avoid raising DPI for nothing:
+
+1. **Render DPI** (`--zoomin`, `--max_long_edge`) — resolution used to rasterize the PDF page.
+2. **Detector resolution** (`--det_limit_side`) — size (pixels) the text-detection step downscales to before finding text boxes.
+
+**When is raising DPI pointless?**
+
+- If the PDF content is an **embedded raster image** (e.g. FuOverflow exams: each question is a `1920×~720px` image, i.e. **271 DPI**), then rendering the page at 432/600/800 DPI **only upscales** that image — it adds no detail, just wastes RAM and time. The effective DPI is capped by the image's native resolution.
+- If the content is **vector text**, the glyphs are already sharp at any DPI; ~288 DPI is more than enough. Errors here usually come from the detector cutting text boxes too short (`"MULTIPLE C"` instead of `"MULTIPLE CHOICE"`), not from blurriness.
+
+**Recommended config** (verified): `--zoomin 4 --max_long_edge 3400 --det_limit_side 1536`.
+
+Measured on one exam PDF (120 pages):
+
+| Config | Words | `"MULTIPLE CHOICE"` complete | Speed |
+|---|---|---|---|
+| 432 DPI + detector 960 (old) | 2,723 | 19/60 pages | ~0.45 s/page |
+| 288 DPI + detector 1536 (new) | **3,957 (+45%)** | **60/60 pages** | ~0.8 s/page |
+
+→ Detector 1536 recovers ~50% more text and fixes all line truncation, at ~1.8× the time. If you need it faster, try `--det_limit_side 1280` (a good middle ground).
+
+If, after raising the detector, **text in the 271-DPI image region is still misread** (e.g. `"lisled"` instead of `listed`), that's a limit of the source image — it needs a separate advanced path (extract the native image then upscale), not a higher page DPI.
 
 ### 3.1. OCR
 To test OCR, you can use the following command:

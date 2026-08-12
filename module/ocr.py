@@ -158,10 +158,13 @@ class TextRecognizer:
 
 
 class TextDetector:
-    def __init__(self, model_dir, device_id: int | None = None):
+    def __init__(self, model_dir, device_id: int | None = None, det_limit_side_len: int = 960):
+        # det_limit_side_len: canh dai toi da (pixel) khi detector downscale anh truoc khi
+        # phat hien text. 960 = goc (PaddleOCR). Tang len (vd 1536) giam loi cat dong
+        # o text nho/day, doi mat cham them mot chut.
         pre_process_list = [{
             'DetResizeForTest': {
-                'limit_side_len': 960,
+                'limit_side_len': det_limit_side_len,
                 'limit_type': "max",
             }
         }, {
@@ -271,7 +274,7 @@ class TextDetector:
 
 
 class OCR:
-    def __init__(self, model_dir=None):
+    def __init__(self, model_dir=None, det_limit_side_len: int = 960):
         """
         If you have trouble downloading HuggingFace models, -_^ this might help!!
 
@@ -295,10 +298,10 @@ class OCR:
                     self.text_detector = []
                     self.text_recognizer = []
                     for device_id in range(PARALLEL_DEVICES):
-                        self.text_detector.append(TextDetector(model_dir, device_id))
+                        self.text_detector.append(TextDetector(model_dir, device_id, det_limit_side_len))
                         self.text_recognizer.append(TextRecognizer(model_dir, device_id))
                 else:
-                    self.text_detector = [TextDetector(model_dir, 0)]
+                    self.text_detector = [TextDetector(model_dir, 0, det_limit_side_len)]
                     self.text_recognizer = [TextRecognizer(model_dir, 0)]
 
             except Exception:
@@ -310,10 +313,10 @@ class OCR:
                     self.text_detector = []
                     self.text_recognizer = []
                     for device_id in range(PARALLEL_DEVICES):
-                        self.text_detector.append(TextDetector(model_dir, device_id))
+                        self.text_detector.append(TextDetector(model_dir, device_id, det_limit_side_len))
                         self.text_recognizer.append(TextRecognizer(model_dir, device_id))
                 else:
-                    self.text_detector = [TextDetector(model_dir, 0)]
+                    self.text_detector = [TextDetector(model_dir, 0, det_limit_side_len)]
                     self.text_recognizer = [TextRecognizer(model_dir, 0)]
 
         self.drop_score = 0.5
