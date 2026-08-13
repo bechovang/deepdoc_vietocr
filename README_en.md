@@ -142,10 +142,10 @@ Minimal command (default settings):
 python pdf_to_txt.py --inputs ./input --output_dir ./output
 ```
 
-**Recommended** config for PDFs with small/dense text (exams, scanned documents…). `run.bat` already uses this — recovers more text and reduces line truncation:
+**Recommended** config for PDFs with small/dense text (exams, scanned documents…). `run.bat` already uses this — recovers more text, reduces truncation, and keeps scattered small text (question stems + answer options A–D) as separate lines:
 ```bash
 python pdf_to_txt.py --inputs ./input --output_dir ./output \
-    --zoomin 4 --max_long_edge 3400 --det_limit_side 1536
+    --zoomin 8 --max_long_edge 5200 --det_limit_side 2048
 ```
 
 #### Options
@@ -154,10 +154,10 @@ python pdf_to_txt.py --inputs ./input --output_dir ./output \
 |--------|---------|-------------|
 | `--inputs` | `./input` | Directory containing input PDF/image files |
 | `--output_dir` | `./output` | Directory to store output TXT files |
-| `--zoomin` | `6` | PDF render resolution (72 × zoomin DPI). Automatically reduced for oversized pages to save RAM. |
+| `--zoomin` | `8` | PDF render resolution (72 × zoomin DPI). Automatically reduced for oversized pages to save RAM. |
 | `--limit` | (no limit) | OCR only the first N pages of each PDF — useful for previewing large files |
-| `--max_long_edge` | `2500` | Maximum long edge (pixels) when rendering a PDF; larger pages are downscaled to save RAM. Increase (e.g. `3400`, `5200`) for higher DPI. |
-| `--det_limit_side` | `960` | Maximum long edge (pixels) at the text-detection step. Increase (e.g. `1536`) to reduce line truncation on small/dense text, at the cost of some speed. |
+| `--max_long_edge` | `5200` | Maximum long edge (pixels) when rendering a PDF; larger pages are downscaled to save RAM. `5200` ≈ **445 DPI** on an A4 page. Increase (e.g. `7000`) to keep small text sharper; decrease (e.g. `2500`) for speed/RAM. |
+| `--det_limit_side` | `2048` | Maximum long edge (pixels) at the text-detection step. A high value (`2048`) keeps **small scattered text** (question stems, answer options A–D) split into separate boxes instead of merged lines; costs some speed. Decrease (e.g. `960`) to run faster. |
 
 Example: preview the first 5 pages of a long PDF:
 ```bash
@@ -171,7 +171,7 @@ python pdf_to_txt.py --inputs ./input --limit 5
 
 #### Handling large / multi-page PDFs
 
-The pipeline renders and OCRs **one page at a time** (only one page is kept in memory), so it can process PDFs with hundreds of pages without freezing. The render resolution is **automatically capped** to a sensible level via `--max_long_edge` (default 2500px). Note that rendering at very high resolution is usually pointless — see **Tuning quality** below. During the run, progress is printed like this:
+The pipeline renders and OCRs **one page at a time** (only one page is kept in memory), so it can process PDFs with hundreds of pages without freezing. The render resolution is **automatically capped** to a sensible level via `--max_long_edge` (default 5200px, ≈445 DPI on A4). Note that rendering at very high resolution is usually pointless — see **Tuning quality** below. During the run, progress is printed like this:
 
 ```
 [1/1] document.pdf
@@ -198,18 +198,30 @@ OCR quality is governed by **two independent knobs** — understand them to avoi
 - If the PDF content is an **embedded raster image** (e.g. FuOverflow exams: each question is a `1920×~720px` image, i.e. **271 DPI**), then rendering the page at 432/600/800 DPI **only upscales** that image — it adds no detail, just wastes RAM and time. The effective DPI is capped by the image's native resolution.
 - If the content is **vector text**, the glyphs are already sharp at any DPI; ~288 DPI is more than enough. Errors here usually come from the detector cutting text boxes too short (`"MULTIPLE C"` instead of `"MULTIPLE CHOICE"`), not from blurriness.
 
-**Recommended config** (verified): `--zoomin 4 --max_long_edge 3400 --det_limit_side 1536`.
+**Recommended config** (verified): `--zoomin 8 --max_long_edge 5200 --det_limit_side 2048`.
 
-Measured on one exam PDF (120 pages):
+**Important exception — small scattered text (scanned MCQ / answer options A–D):**
+
+For a page that is a **scanned image with small, scattered text** (e.g. a question + the four A/B/C/D options in a multiple-choice exam), BOTH knobs must be high enough — the render DPI and the detector:
+
+| Config | Boxes detected on sample page | Result |
+|---|---|---|
+| render 214 DPI + detector 960 (old) | **4 / 20** | Small text crushed/merged, most questions & options missed |
+| render 445 DPI + detector 2048 (new) | **20 / 20** | `Question 27`, full question stem, each phase line and each option A–D separated cleanly |
+
+→ The root cause is **not a weak detector but resolution**: `--max_long_edge 2500` + `--det_limit_side 960` downsample too aggressively, merging small text. At ~445 DPI render + 2048px detector, all 20 small-text regions are split into separate boxes and the question reads fully (no more truncation).
+
+Rough speed comparison (verified on a 120-page exam PDF):
 
 | Config | Words | `"MULTIPLE CHOICE"` complete | Speed |
 |---|---|---|---|
 | 432 DPI + detector 960 (old) | 2,723 | 19/60 pages | ~0.45 s/page |
-| 288 DPI + detector 1536 (new) | **3,957 (+45%)** | **60/60 pages** | ~0.8 s/page |
+| 288 DPI + detector 1536 (middle) | 3,957 (+45%) | 60/60 pages | ~0.8 s/page |
+| 445 DPI + detector 2048 (recommended) | (higher still) | 60/60 pages | ~1.2 s/page |
 
-→ Detector 1536 recovers ~50% more text and fixes all line truncation, at ~1.8× the time. If you need it faster, try `--det_limit_side 1280` (a good middle ground).
+→ Raising both resolutions recovers more small text and fixes line truncation, at ~2–2.5× the time of the old config. For more speed, drop `--det_limit_side` to `1280` or `--max_long_edge` to `3400` (keeps most of the benefit).
 
-If, after raising the detector, **text in the 271-DPI image region is still misread** (e.g. `"lisled"` instead of `listed`), that's a limit of the source image — it needs a separate advanced path (extract the native image then upscale), not a higher page DPI.
+If, after raising the detector, **text in the 271-DPI image region is still misread** (e.g. `"lisled"` instead of `listed`), that's a limit of the source image — it needs a separate advanced path (extract the native image then upscale), not a higher page DPI. Note that answer options containing **Roman numerals** (I–VI) may still be misread by VietOCR (e.g. `I→1`, `V→V`) — this is normal and does not affect context, since detection still keeps each option's structure intact.
 
 ### 3.1. OCR
 To test OCR, you can use the following command:

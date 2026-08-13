@@ -41,9 +41,10 @@ if %errorlevel% neq 0 (
 
 echo.
 REM Chay pipeline voi output khong dem bo dem (unbuffered) de xem tien trinh truc tiep
-REM Cau hinh: zoomin 4 (~288 DPI) + det_limit_side 1536 -> giam loi cat dong o text nho.
-REM (Noi dung PDF la anh raster ~271 DPI nen khong can render DPI cao hon.)
-"%PY%" -u pdf_to_txt.py --inputs "./input" --output_dir "./output" --zoomin 4 --max_long_edge 3400 --det_limit_side 1536
+REM Cau hinh (khuyen dung): zoomin 8 + max_long_edge 5200 (~445 DPI) + det_limit_side 2048
+REM -> text nho rai rac (cau hoi, 4 dap an A-D) duoc tach rieng, khong dinh line.
+REM render 445DPI + detector 2048: tach du 20/20 box tren trang scan de thi mau.
+"%PY%" -u pdf_to_txt.py --inputs "./input" --output_dir "./output" --zoomin 8 --max_long_edge 5200 --det_limit_side 2048
 
 echo.
 pause

@@ -148,17 +148,26 @@ def main():
                         help='Thu muc chua file PDF/anh dau vao. Mac dinh: ./input')
     parser.add_argument('--output_dir', default='./output',
                         help='Thu muc luu file TXT. Mac dinh: ./output')
-    parser.add_argument('--zoomin', type=int, default=5,
-                        help='Do phan giai khi render PDF (72*zoomin DPI). Mac dinh: 5 (=360 DPI). '
-                             'Tu dong giam xuong voi trang qua to de tiet kiem RAM.')
+    parser.add_argument('--zoomin', type=int, default=8,
+                        help='Do phan giai khi render PDF (72*zoomin DPI). Mac dinh: 8 (=576 DPI). '
+                             'Tu dong giam xuong voi trang qua to de tiet kiem RAM. '
+                             'Tang de text nho rai rac (de thi quet) net hon khi OCR.')
+    # Luu y: voi text nho rai rac, render can DU NHIEU DPI va detector can det_limit_side cao.
+    # Rib trai lai: max_long_edge=2500 + det_limit_side=960 khien scan text nho dinh line.
+    # Test: render ~445 DPI (max_long_edge=5200) + det_limit_side=2048 -> tach du cac dong nho
+    # (Question, dap an A-D) thanh box rieng. Chon gia tri mac dinh nay de duoc luon ket qua tot.
     parser.add_argument('--limit', type=int, default=None,
                         help='Chi OCR N trang dau tien cua moi PDF (dung de xem thu voi file lon).')
-    parser.add_argument('--max_long_edge', type=int, default=2500,
+    parser.add_argument('--max_long_edge', type=int, default=5200,
                         help='Canh dai toi da (pixel) khi render PDF; trang to hon se bi giam DPI '
-                             'de tiet kiem RAM. Mac dinh: 2500. Tang len (vd 5200) neu muon DPI cao hon.')
-    parser.add_argument('--det_limit_side', type=int, default=960,
-                        help='Canh dai toi da (pixel) cua buoc phat hien text (detector). Mac dinh: 960. '
-                             'Tang len (vd 1536) de giam loi cat dong o text nho/day; doi mat cham them.')
+                             'de tiet kiem RAM. Mac dinh: 5200 (~445 DPI trang A4). '
+                             'Tang len (vd 5200-7000) giu text nho net de OCR khoi mat/dinh line '
+                             '(dap an A-D). Giam xuong (vd 2500) neu muon chay nhanh va tiet kiem RAM.')
+
+    parser.add_argument('--det_limit_side', type=int, default=2048,
+                        help='Canh dai toi da (pixel) cua buoc phat hien text (detector). Mac dinh: 2048. '
+                             'Cao (2048) giu duoc text nho rai rac (dap an A-D) tach rieng, '
+                             'khoi dinh line. Giam xuong (vd 960) neu muon nhanh hon.')
     args = parser.parse_args()
 
     input_dir = os.path.abspath(args.inputs)

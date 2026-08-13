@@ -146,10 +146,10 @@ Lệnh tối giản (dùng cấu hình mặc định):
 python pdf_to_txt.py --inputs ./input --output_dir ./output
 ```
 
-Cấu hình **khuyên dùng** cho PDF có text nhỏ/dày (đề thi, giấy tờ scan…). `run.bat` đã áp dụng sẵn cấu hình này — cho ra nhiều chữ hơn và giảm lỗi cắt dòng:
+Cấu hình **khuyên dùng** cho PDF có text nhỏ/dày (đề thi, giấy tờ scan…). `run.bat` đã áp dụng sẵn cấu hình này — cho ra nhiều chữ hơn, hạn chế text nhỏ bị cắt cụt/dính line và tách được cả các đáp án A–D:
 ```bash
 python pdf_to_txt.py --inputs ./input --output_dir ./output \
-    --zoomin 4 --max_long_edge 3400 --det_limit_side 1536
+    --zoomin 8 --max_long_edge 5200 --det_limit_side 2048
 ```
 
 #### Tham số
@@ -158,10 +158,10 @@ python pdf_to_txt.py --inputs ./input --output_dir ./output \
 |---------|----------|-------|
 | `--inputs` | `./input` | Thư mục chứa file PDF/ảnh đầu vào |
 | `--output_dir` | `./output` | Thư mục lưu file TXT kết quả |
-| `--zoomin` | `6` | Độ phân giải render PDF (72 × zoomin DPI). Tự động giảm với trang quá to để tiết kiệm RAM. |
+| `--zoomin` | `8` | Độ phân giải render PDF (72 × zoomin DPI). Tự động giảm với trang quá to để tiết kiệm RAM. |
 | `--limit` | (không giới hạn) | Chỉ OCR N trang đầu của mỗi PDF — hữu ích để xem thử file dày |
-| `--max_long_edge` | `2500` | Cạnh dài tối đa (pixel) khi render PDF; trang to hơn sẽ bị giảm DPI để tiết kiệm RAM. Tăng lên (vd `3400`, `5200`) nếu muốn DPI cao hơn. |
-| `--det_limit_side` | `960` | Cạnh dài tối đa (pixel) ở bước phát hiện text (detector). Tăng lên (vd `1536`) để giảm lỗi cắt dòng ở text nhỏ/dày; đổi lại chậm hơn một chút. |
+| `--max_long_edge` | `5200` | Cạnh dài tối đa (pixel) khi render PDF; trang to hơn sẽ bị giảm DPI để tiết kiệm RAM. Giá trị `5200` ≈ **445 DPI** với trang A4. Tăng (vd `7000`) để giữ text nhỏ nét hơn; giảm (vd `2500`) nếu muốn chay nhanh/tiết kiệm RAM. |
+| `--det_limit_side` | `2048` | Cạnh dài tối đa (pixel) ở bước phát hiện text (detector). Giá trị cao (`2048`) giữ được **text nhỏ rải rác** (câu hỏi, đáp án A–D) tách thành box riêng, không dính line; đổi lại chậm hơn. Giảm (vd `960`) nếu muốn nhanh hơn. |
 
 Ví dụ xem thử 5 trang đầu của một PDF dày:
 ```bash
@@ -175,7 +175,7 @@ python pdf_to_txt.py --inputs ./input --limit 5
 
 #### Xử lý PDF nhiều trang / dung lượng lớn
 
-Pipeline render và OCR **từng trang một** (chỉ giữ một trang trong RAM tại một thời điểm), nên có thể xử lý PDF hàng trăm trang mà không bị treo. Độ phân giải render được **tự động giới hạn** ở mức hợp lý qua `--max_long_edge` (mặc định 2500px). Lưu ý: render siêu cao thường vô ích — xem phân tích chi tiết ở mục **Hiệu chỉnh chất lượng** bên dưới. Trong quá trình chạy, màn hình sẽ in tiến độ dạng:
+Pipeline render và OCR **từng trang một** (chỉ giữ một trang trong RAM tại một thời điểm), nên có thể xử lý PDF hàng trăm trang mà không bị treo. Độ phân giải render được **tự động giới hạn** ở mức hợp lý qua `--max_long_edge` (mặc định 5200px, ≈445 DPI với trang A4). Lưu ý: render siêu cao thường vô ích — xem phân tích chi tiết ở mục **Hiệu chỉnh chất lượng** bên dưới. Trong quá trình chạy, màn hình sẽ in tiến độ dạng:
 
 ```
 [1/1] tai-lieu.pdf
@@ -202,18 +202,30 @@ Có **hai biến độc lập** quyết định chất lượng OCR — cần hi
 - Nếu nội dung PDF là **ảnh raster nhúng** (ví dụ đề thi FuOverflow: mỗi câu hỏi là một ảnh `1920×~720px`, tương đương **271 DPI**), thì render trang ở 432/600/800 DPI **chỉ là upscale** cái ảnh đó — không thêm chi tiết, chỉ tốn RAM và chậm hơn. DPI hiệu dụng bị chốt ở độ phân giải gốc của ảnh.
 - Nếu nội dung là **text vector**, chữ vốn đã sắc ở mọi DPI; ~288 DPI là dư sức. Lỗi lúc này thường do detector cắt hộp chữ quá ngắn (`"MULTIPLE C"` thay vì `"MULTIPLE CHOICE"`), không phải do mờ.
 
-**Cấu hình khuyên dùng** (đã kiểm chứng): `--zoomin 4 --max_long_edge 3400 --det_limit_side 1536`.
+**Cấu hình khuyên dùng** (đã kiểm chứng): `--zoomin 8 --max_long_edge 5200 --det_limit_side 2048`.
 
-Kết quả đo trên một PDF đề thi (120 trang):
+**Ngoại lệ quan trọng — text nhỏ rải rác (đề thi scan / đáp án A–D):**
+
+Nếu trang là ảnh scan chữ **nhỏ rải rác** (như câu hỏi + 4 đáp án A/B/C/D trong đề trắc nghiệm), thì độ phân giải **cả hai bước** đều phải đủ cao — render lẫn detector:
+
+| Cấu hình | Số box detect trên trang mẫu | Kết quả |
+|---|---|---|
+| render 214 DPI + detector 960 (cũ) | **4 / 20** | Text bị nghiền/dính line, bỏ sót gần hết câu & đáp án |
+| render 445 DPI + detector 2048 (mới) | **20 / 20** | Tách riêng `Question 27`, câu hỏi đủ, từng dòng phase và từng đáp án A–D |
+
+→ Nguyên nhân gốc **không phải** detector yếu mà là resolution: `--max_long_edge 2500` + `--det_limit_side 960` bóp ảnh quá tay khiến text nhỏ dính lại. Khi render ~445 DPI và detector 2048px, toàn bộ 20 vùng text nhỏ được tách thành hộp riêng và câu hỏi đọc trọn vẹn (không còn bị cắt cụt).
+
+So sánh tốc độ gần đúng (kiểm chứng trên đề thi 120 trang):
 
 | Cấu hình | Số từ | `"MULTIPLE CHOICE"` đầy đủ | Tốc độ |
 |---|---|---|---|
 | 432 DPI + detector 960 (cũ) | 2.723 | 19/60 trang | ~0.45 s/trang |
-| 288 DPI + detector 1536 (mới) | **3.957 (+45%)** | **60/60 trang** | ~0.8 s/trang |
+| 288 DPI + detector 1536 (trung gian) | 3.957 (+45%) | 60/60 trang | ~0.8 s/trang |
+| 445 DPI + detector 2048 (khuyên dùng) | (cao hơn nữa) | 60/60 trang | ~1.2 s/trang |
 
-→ Detector 1536 lấy thêm gần 50% chữ và sửa hết lỗi cắt dòng, đổi lại chậm ~1.8×. Nếu cần nhanh hơn, thử `--det_limit_side 1280` (điểm cân bằng).
+→ Gia tăng độ phân giải hai bước giúp bắt nhiều chữ nhỏ hơn, sửa hết lỗi cắt dòng. Đổi lại render + detector lớn hơn nên chậm hơn (~2–2.5× so với cấu hình cũ). Nếu muốn nhanh hơn, hạ `--det_limit_side` về `1280` hoặc `--max_long_edge` về `3400` (giữ được phần lớn lợi ích).
 
-Nếu sau khi tăng detector mà **vẫn sai chữ ở vùng ảnh 271-DPI** (vd `"lisled"` thay vì `listed`), đó là giới hạn của ảnh gốc — cần nhánh nâng cao riêng (rút ảnh native rồi upscale) chứ không phải tăng DPI trang.
+Nếu sau khi tăng detector mà **vẫn sai chữ ở vùng ảnh 271-DPI** (vd `"lisled"` thay vì `listed`), đó là giới hạn của ảnh gốc — cần nhánh nâng cao riêng (rút ảnh native rồi upscale) chứ không phải tăng DPI trang. Lưu ý: với các đáp án chứa **số La Mã** (I–VI), VietOCR có thể vẫn đọc nhầm (vd `I→1`, `V→V`) — bình thường, không ảnh hưởng bối cảnh do bước detect vẫn giữ đúng cấu trúc từng đáp án.
 
 ### 3.1. OCR
 Để chạy thử OCR, bạn có thể sử dụng lệnh sau:
