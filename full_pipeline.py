@@ -14,9 +14,10 @@ sys.path.insert(
                 os.path.abspath(__file__)),
             '../../')))
 
-from module.ocr import OCR 
+from module.ocr import OCR
 from module import LayoutRecognizer, TableStructureRecognizer, init_in_out
 from equation_mvp.equation_ocr import image_to_latex, crop_equation_region
+from figure_mvp.figure_export import extract_figures
 
 from datetime import datetime
 
@@ -107,6 +108,7 @@ def main(args):
     print(f"Output paths: {outputs}")
     layout_recognizer = LayoutRecognizer("layout")
     ocr = OCR()
+    figs_dir = os.path.join(args.output_dir, "figs")
     for idx, img in enumerate(images):
         print(f"Processing image {idx}: {outputs[idx]}")
         start_time = time.time()  # <-- Start timing
@@ -146,6 +148,15 @@ def main(args):
                 else:
                     markdown = "_(equation)_"
                 region_and_pos.append((y_pos, markdown))
+
+            if label in ["figure"] and score >= float(args.threshold):
+                print(f"Exporting figure region: {region}")
+                figs = extract_figures(img, figs_dir, page_label=f"img{idx}",
+                                       rel_prefix="figs", thr=float(args.threshold),
+                                       regions=[region])
+                for fy, _marker, rel_path in figs:
+                    k = rel_path.rsplit("/", 1)[-1]
+                    region_and_pos.append((fy, f"![{k}]({rel_path})"))
 
         # Now OCR any remaining undetected area (including non-table/figure)
         inv_mask = mask.point(lambda p: 1 - p)

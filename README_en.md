@@ -223,6 +223,33 @@ Rough speed comparison (verified on a 120-page exam PDF):
 
 If, after raising the detector, **text in the 271-DPI image region is still misread** (e.g. `"lisled"` instead of `listed`), that's a limit of the source image — it needs a separate advanced path (extract the native image then upscale), not a higher page DPI. Note that answer options containing **Roman numerals** (I–VI) may still be misread by VietOCR (e.g. `I→1`, `V→V`) — this is normal and does not affect context, since detection still keeps each option's structure intact.
 
+### 3.0.1. Figure/diagram extraction (content OCR cannot capture)
+
+Some pages contain **diagrams/charts/pictures** (e.g. networking exams with "Refer to the exhibit" and a Router–Switch–Host topology): plain OCR only picks up floating device labels while the **connection structure is lost**. The pipeline can extract these regions automatically:
+
+```bash
+python pdf_to_txt.py --inputs ./input --output_dir ./output --figures
+REM or simply: double-click run_figure_detect.bat
+```
+
+Result:
+
+- Figure regions are detected with the existing layout model (`onnx/layout.onnx`), **cropped from the high-resolution page render** and saved to `output/<file_name>_figs/tr003_fig1.png`.
+- The TXT gets a marker **at the right y-position**: `[HÌNH 1: <file_name>_figs/tr003_fig1.png]` — open the PNG to see the original diagram.
+- Text inside the figure region (labels like RouterA, Switch1…) is still OCR-ed as usual.
+
+Notes:
+
+- The feature is **OFF by default** (pass `--figures` to enable) — `run.bat` and the GUI keep their old behavior; the GUI has a "Tách hình (diagram)" checkbox.
+- The layout pass adds ~0.5–1.5 s/page on CPU.
+- Only `figure`/`image` labels are accepted: verified on 10 FuOverflow exam PDFs, every other high-score region (labeled `reference`) is a **recurring template logo/watermark** (same position on every page), not an exhibit — skipping them avoids junk PNGs.
+
+You can also run a **detection-only report** of which pages contain figures (no OCR, fast):
+
+```bash
+python scan_figures.py --inputs ./input --report figure_report.txt
+```
+
 ### 3.1. OCR
 To test OCR, you can use the following command:
  ```bash

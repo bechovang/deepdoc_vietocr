@@ -53,14 +53,22 @@ def page_resolution(page, zoomin, max_long_edge=4000):
     return max(resolution, 72.0)  # it nhat 72 DPI
 
 
-def process_pdf_streaming(ocr, pdf_path, out_txt, zoomin, limit=None, max_long_edge=2500):
+def process_pdf_streaming(ocr, pdf_path, out_txt, zoomin, limit=None, max_long_edge=2500,
+                          extract_figures=False):
     """
     Render + OCR tung trang va ghi vao file TXT ngay (streaming).
     - Chi giu 1 trang trong RAM tai 1 thoi diem -> khong bi treo voi PDF nhieu trang.
     - Ghi (flush) sau moi trang: neu dung giua chang (Ctrl+C) van giu duoc phan da lam.
+    - extract_figures=True: phat hien vung figure (diagram/bieu do), cat luu PNG
+      vao <output>/<ten_file>_figs/ va chen marker [HÌNH k: ...] vao TXT.
     Tra ve (out_txt, so_trang_da_xu_ly).
     """
     import pdfplumber
+
+    stem = os.path.splitext(os.path.basename(out_txt))[0]
+    fig_dir = os.path.join(os.path.dirname(out_txt), stem + '_figs')
+    rel_prefix = stem + '_figs'
+    n_figs = 0
 
     n_done = 0
     with _PDF_LOCK:
@@ -74,7 +82,13 @@ def process_pdf_streaming(ocr, pdf_path, out_txt, zoomin, limit=None, max_long_e
                         break
                     resolution = page_resolution(page, zoomin, max_long_edge=max_long_edge)
                     img = page.to_image(resolution=resolution).annotated
-                    txt = image_to_text(ocr, img)
+                    if extract_figures:
+                        txt = image_to_text(ocr, img, fig_dir=fig_dir,
+                                            page_label=f'tr{pi:03d}', rel_prefix=rel_prefix,
+                                            page=page)
+                        n_figs += txt.count('[HÌNH ')
+                    else:
+                        txt = image_to_text(ocr, img)
                     del img  # giai phong anh khoi RAM ngay
 
                     body = txt.strip() if txt.strip() else '(trang khong phat hien van ban)'
@@ -89,19 +103,37 @@ def process_pdf_streaming(ocr, pdf_path, out_txt, zoomin, limit=None, max_long_e
                     eta = elapsed / pi * (target - pi) if pi else 0
                     print(f'    - OCR trang {pi}/{target} xong'
                           f'  ({elapsed:.0f}s da qua, con lai ~{eta:.0f}s)')
+    if extract_figures and n_figs:
+        print(f'    -> Da tach {n_figs} hinh (diagram) vao: {fig_dir}')
     return out_txt, n_done
 
 
-def image_to_text(ocr, img):
+def image_to_text(ocr, img, fig_dir=None, page_label='', rel_prefix=None, page=None):
     """
     OCR mot anh PIL -> tra ve chuoi text (cac dong cach nhau bang xuong dong).
     ocr(...) tra ve danh sach [(box, (text, score)), ...]
+
+    Neu truyen fig_dir: dong thoi phat hien vung figure (diagram/bieu do -
+    vung OCR khong xu ly duoc), cat luu PNG vao fig_dir va chen marker
+    [HÌNH k: duong_dan] dung vi tri theo truc y trong chuoi ket qua.
+    Neu co page (trang pdfplumber): detect them tren anh nhung (chinh xac
+    hon voi exhibit nho - xem figure_mvp.detect_figures_page).
     """
     result = ocr(np.array(img))
-    if not result:
-        return ''
-    lines = [item[1][0] for item in result if item[1] and item[1][0]]
-    return '\n'.join(lines)
+
+    # (y_dinh_box, text) - giu vi tri de tron marker hinh vao dung cho
+    lines = [(item[0][0][1], item[1][0]) for item in result if item[1] and item[1][0]]
+
+    if fig_dir:
+        from figure_mvp.figure_export import extract_figures
+        figures = extract_figures(img, fig_dir, page_label, rel_prefix=rel_prefix,
+                                  page=page)
+        if figures:
+            # -0.5 de marker dung truoc cac dong text cung do cao
+            lines = lines + [(y - 0.5, marker) for y, marker, _ in figures]
+            lines.sort(key=lambda t: t[0])
+
+    return '\n'.join(text for _, text in lines)
 
 
 def collect_inputs(input_dir):
@@ -117,11 +149,13 @@ def collect_inputs(input_dir):
     return files
 
 
-def process_file(ocr, fpath, output_dir, zoomin, limit=None, max_long_edge=2500):
+def process_file(ocr, fpath, output_dir, zoomin, limit=None, max_long_edge=2500,
+                 extract_figures=False):
     """
     Xu ly 1 file (PDF hoac anh) -> ghi 1 file TXT.
     - PDF: xu ly streaming tung trang (tiet kiem RAM).
     - Anh: OCR truc tiep.
+    - extract_figures=True: tach vung figure (diagram) ra PNG + chen marker vao TXT.
     Tra ve (out_txt, so_trang) hoac raise loi.
     """
     name = os.path.basename(fpath)
@@ -130,10 +164,16 @@ def process_file(ocr, fpath, output_dir, zoomin, limit=None, max_long_edge=2500)
     out_txt = os.path.join(output_dir, stem + '.txt')
 
     if ext == PDF_EXT:
-        out_txt, n_pages = process_pdf_streaming(ocr, fpath, out_txt, zoomin, limit, max_long_edge=max_long_edge)
+        out_txt, n_pages = process_pdf_streaming(ocr, fpath, out_txt, zoomin, limit,
+                                                 max_long_edge=max_long_edge,
+                                                 extract_figures=extract_figures)
     else:
         img = Image.open(fpath).convert('RGB')
-        txt = image_to_text(ocr, img)
+        if extract_figures:
+            txt = image_to_text(ocr, img, fig_dir=os.path.join(output_dir, stem + '_figs'),
+                                page_label='img', rel_prefix=stem + '_figs')
+        else:
+            txt = image_to_text(ocr, img)
         with open(out_txt, 'w', encoding='utf-8') as f:
             f.write(txt)
         n_pages = 1
@@ -168,6 +208,11 @@ def main():
                         help='Canh dai toi da (pixel) cua buoc phat hien text (detector). Mac dinh: 2048. '
                              'Cao (2048) giu duoc text nho rai rac (dap an A-D) tach rieng, '
                              'khoi dinh line. Giam xuong (vd 960) neu muon nhanh hon.')
+    parser.add_argument('--figures', action='store_true',
+                        help='Tach vung figure (diagram/bieu do/anh - thu OCR khong xu ly duoc) '
+                             'ra file PNG trong <output>/<ten_file>_figs/ va chen marker '
+                             '[HÌNH k: duong_dan] vao TXT dung vi tri. '
+                             'Mac dinh TAT de khong anh huong toc do OCR thong thuong.')
     args = parser.parse_args()
 
     input_dir = os.path.abspath(args.inputs)
@@ -195,6 +240,8 @@ def main():
     print(f'  Input : {input_dir}')
     print(f'  Output: {output_dir}')
     print(f'  Thiet bi: CPU')
+    if args.figures:
+        print(f'  Tach hinh (figure): BAT  -> marker [HÌNH k: ...] + PNG trong <ten_file>_figs/')
     print('=' * 56)
     print('[*] Dang nap mo hinh OCR (lan dau se cham mot chut) ...')
 
@@ -213,7 +260,8 @@ def main():
         t0 = time.time()
         try:
             out_txt, n_pages = process_file(ocr, fpath, output_dir, args.zoomin, args.limit,
-                                                max_long_edge=args.max_long_edge)
+                                                max_long_edge=args.max_long_edge,
+                                                extract_figures=args.figures)
             elapsed = time.time() - t0
             avg = elapsed / n_pages if n_pages else elapsed
             print(f'    -> Da luu: {os.path.basename(out_txt)}  '

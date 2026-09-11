@@ -227,6 +227,33 @@ So sánh tốc độ gần đúng (kiểm chứng trên đề thi 120 trang):
 
 Nếu sau khi tăng detector mà **vẫn sai chữ ở vùng ảnh 271-DPI** (vd `"lisled"` thay vì `listed`), đó là giới hạn của ảnh gốc — cần nhánh nâng cao riêng (rút ảnh native rồi upscale) chứ không phải tăng DPI trang. Lưu ý: với các đáp án chứa **số La Mã** (I–VI), VietOCR có thể vẫn đọc nhầm (vd `I→1`, `V→V`) — bình thường, không ảnh hưởng bối cảnh do bước detect vẫn giữ đúng cấu trúc từng đáp án.
 
+### 3.0.1. Tách hình — figure/diagram (OCR không xử lý được)
+
+Một số trang chứa **sơ đồ/biểu đồ/ảnh minh họa** (vd đề mạng có "Refer to the exhibit" với topology Router–Switch–Host): OCR chỉ đọc được nhãn thiết bị lơ lửng, còn **cấu trúc nối kết thì mất sạch**. Pipeline hỗ trợ tự động tách các vùng này:
+
+```bash
+python pdf_to_txt.py --inputs ./input --output_dir ./output --figures
+REM hoac don gian: double-click run_figure_detect.bat
+```
+
+Kết quả:
+
+- Vùng figure được phát hiện bằng mô hình layout sẵn có (`onnx/layout.onnx`), **cắt khỏi render phân giải cao** và lưu vào `output/<ten_file>_figs/tr003_fig1.png`.
+- Trong TXT xuất hiện marker **đúng vị trí theo trục y**: `[HÌNH 1: <ten_file>_figs/tr003_fig1.png]` — mở file PNG kèm theo là thấy nguyên sơ đồ gốc.
+- Text bên trong vùng hình (nhãn RouterA, Switch1…) vẫn được OCR bình thường.
+
+Ghi chú:
+
+- Tính năng **mặc định TẮT** (`--figures` để bật) — `run.bat` và GUI giữ nguyên hành vi cũ; GUI có checkbox "Tách hình (diagram)".
+- Layout pass thêm ~0.5–1.5 s/trang CPU.
+- Chỉ nhận nhãn `figure`/`image`: đã kiểm chứng trên 10 đề thi FuOverflow, các vùng còn lại bị model gán `reference` đều là **logo/watermark template** (lặp lại cùng vị trí mọi trang) chứ không phải exhibit — không tách để tránh sinh PNG rác.
+
+Ngoài ra có thể **chỉ quét báo cáo** trang nào có figure (không OCR, nhanh):
+
+```bash
+python scan_figures.py --inputs ./input --report bao_cao_hinh.txt
+```
+
 ### 3.1. OCR
 Để chạy thử OCR, bạn có thể sử dụng lệnh sau:
  ```bash

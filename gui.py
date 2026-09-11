@@ -25,11 +25,12 @@ PDF_EXT = '.pdf'
 # Worker: chay OCR tren thread rieng, day message vao queue
 # -------------------------------------------------------------------
 class OcrWorker:
-    def __init__(self, file_paths, output_dir, zoomin, msg_queue):
+    def __init__(self, file_paths, output_dir, zoomin, msg_queue, extract_figures=False):
         self.file_paths = file_paths
         self.output_dir = output_dir
         self.zoomin = zoomin
         self.msg_queue = msg_queue
+        self.extract_figures = extract_figures
         self._stop = False
 
     def stop(self):
@@ -71,7 +72,8 @@ class OcrWorker:
 
                 t0 = time.time()
                 try:
-                    out_txt, n_pages = process_file(ocr, fpath, self.output_dir, self.zoomin)
+                    out_txt, n_pages = process_file(ocr, fpath, self.output_dir, self.zoomin,
+                                                    extract_figures=self.extract_figures)
                     elapsed = time.time() - t0
                     avg = elapsed / n_pages if n_pages else elapsed
                     self.msg_queue.put(("log", f"    -> {os.path.basename(out_txt)}  "
@@ -116,6 +118,7 @@ class OcrGui:
         self.file_paths = []  # danh sach duong dan file
         self.output_dir = os.path.join(ROOT_DIR, "output")
         self.zoomin = tk.IntVar(value=5)
+        self.extract_figs = tk.BooleanVar(value=False)  # tach hinh (figure) - mac dinh TAT
         self.worker = None
         self.worker_thread = None
         self.msg_queue = queue.Queue()
@@ -139,6 +142,8 @@ class OcrGui:
 
         ttk.Label(btn_row, text="Zoomin:").pack(side="right", padx=(10, 3))
         ttk.Spinbox(btn_row, from_=1, to=12, textvariable=self.zoomin, width=4).pack(side="right")
+        ttk.Checkbutton(btn_row, text="Tách hình (diagram)", variable=self.extract_figs
+                        ).pack(side="right", padx=(15, 0))
 
         self.lbl_count = ttk.Label(frame_files, text="0 file", foreground="#666")
         self.lbl_count.pack(anchor="w")
@@ -279,7 +284,8 @@ class OcrGui:
             file_paths=list(self.file_paths),
             output_dir=self.output_dir,
             zoomin=self.zoomin.get(),
-            msg_queue=self.msg_queue
+            msg_queue=self.msg_queue,
+            extract_figures=self.extract_figs.get()
         )
         self.worker_thread = threading.Thread(target=self.worker.run, daemon=True)
         self.worker_thread.start()
@@ -291,6 +297,8 @@ class OcrGui:
         self._log(f"  Số file: {len(self.file_paths)}\n")
         self._log(f"  Output : {self.output_dir}\n")
         self._log(f"  Zoomin : {self.zoomin.get()}\n")
+        fig_on = "BẬT" if self.extract_figs.get() else "TẮT"
+        self._log(f"  Tách hình (figure): {fig_on}\n")
         self._log("=" * 56 + "\n\n", "done")
 
     def _stop_ocr(self):

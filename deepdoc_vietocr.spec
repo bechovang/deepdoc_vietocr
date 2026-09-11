@@ -37,6 +37,7 @@ hidden_imports = [
     "module.operators",
     "module.postprocess",
     "module.seeit",
+    "figure_mvp.figure_export",
     "utils.file_utils",
     "utils.constants",
     "utils.settings",
