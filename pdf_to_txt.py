@@ -126,8 +126,10 @@ def image_to_text(ocr, img, fig_dir=None, page_label='', rel_prefix=None, page=N
 
     if fig_dir:
         from figure_mvp.figure_export import extract_figures
+        # Truyen kem text box de extract_figures loai vung thuc chat la khoi
+        # text (screenshot cau hoi bi nham la figure) - khong crop, de OCR.
         figures = extract_figures(img, fig_dir, page_label, rel_prefix=rel_prefix,
-                                  page=page)
+                                  page=page, text_boxes=[item[0] for item in result])
         if figures:
             # -0.5 de marker dung truoc cac dong text cung do cao
             lines = lines + [(y - 0.5, marker) for y, marker, _ in figures]

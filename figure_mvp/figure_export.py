@@ -23,6 +23,18 @@ FIGURE_CROP_PAD_RATIO = 0.10
 FIGURE_CROP_PAD_MIN = 8
 # Bỏ qua vùng figure quá nhỏ (vụn vặt / nhiễu)
 FIGURE_MIN_SIZE = 40
+# Vùng bị text box OCR phủ >= ngưỡng này diện tích KHÔNG phải figure mà là
+# khối text (vd screenshot nguyên câu hỏi bị model nham label 'image' trong
+# mot so format de thi) -> de OCR xu ly, khong crop. Exhibit that chi chua
+# nhan thiet bi nho rac nen do phu thap.
+FIGURE_TEXT_COVER_THR = 0.45
+# Tương tự nhưng đếm SỐ text box có tâm nằm trong vùng: screenshot câu hỏi
+# chứa nguyên khối text (câu hỏi + các đáp án + UI -> 16-26 box) trong khi
+# exhibit thật chỉ chứa vài nhãn thiết bị (0-8 box). Đo trên bộ nwc204:
+# FP 16/21/26 box vs TP 0/2/8 box -> ngưỡng 12.
+# (Riêng độ-phủ-diện-tích không phân biệt được: screenshot có cột chữ hẹp
+# bên trái, phần còn lại là khoảng trắng của UI nên cover cũng thấp.)
+FIGURE_TEXT_BOX_MAX = 12
 
 # Lazy-load model để tránh chậm khi import (model layout ~75MB)
 _layout_recognizer = None
@@ -108,6 +120,51 @@ def _iou(a, b):
     area_a = (a[2] - a[0]) * (a[3] - a[1])
     area_b = (b[2] - b[0]) * (b[3] - b[1])
     return inter / float(area_a + area_b - inter)
+
+
+def _text_coverage(bbox, text_boxes):
+    """
+    Ty le dien tich bbox bi phu boi cac text box OCR (0..1).
+
+    Args:
+        bbox: [x0,y0,x1,y1] vung figure
+        text_boxes: cac box 4 diem [[x,y]x4] tra ve tu ocr(...) cua trang
+
+    Dung de phan biet exhibit that (nhan thiet bi rac, do phu thap) voi
+    khoi text bi nham la figure (screenshot cau hoi, terminal output... -
+    do phu cao vi toan box chu).
+    """
+    x0, y0, x1, y1 = bbox
+    area = max(0.0, (x1 - x0) * (y1 - y0))
+    if area <= 0 or not text_boxes:
+        return 0.0
+    cover = 0.0
+    for box in text_boxes:
+        try:
+            xs = [p[0] for p in box]
+            ys = [p[1] for p in box]
+            cx0, cx1 = max(x0, min(xs)), min(x1, max(xs))
+            cy0, cy1 = max(y0, min(ys)), min(y1, max(ys))
+            if cx1 > cx0 and cy1 > cy0:
+                cover += (cx1 - cx0) * (cy1 - cy0)
+        except Exception:
+            continue
+    return min(cover / area, 1.0)
+
+
+def _count_boxes_inside(bbox, text_boxes):
+    """Đếm số text box OCR có TÂM nằm trong bbox."""
+    x0, y0, x1, y1 = bbox
+    n = 0
+    for box in text_boxes:
+        try:
+            cx = sum(p[0] for p in box) / 4.0
+            cy = sum(p[1] for p in box) / 4.0
+            if x0 <= cx <= x1 and y0 <= cy <= y1:
+                n += 1
+        except Exception:
+            continue
+    return n
 
 
 def detect_figures_page(page, page_img, thr=FIGURE_SCORE_THR):
@@ -224,7 +281,7 @@ def crop_figure_region(img, region, pad_ratio=FIGURE_CROP_PAD_RATIO,
 
 
 def extract_figures(img, fig_dir, page_label, rel_prefix=None, thr=FIGURE_SCORE_THR,
-                    regions=None, page=None):
+                    regions=None, page=None, text_boxes=None):
     """
     Phát hiện + cắt + lưu các vùng figure trong 1 ảnh trang.
 
@@ -239,6 +296,11 @@ def extract_figures(img, fig_dir, page_label, rel_prefix=None, thr=FIGURE_SCORE_
                  đã chạy layout) - truyền vào để không chạy lại model
         page: trang pdfplumber - nếu có, detect thêm trên ảnh nhúng
               (xem detect_figures_page)
+        text_boxes: các text box [(box 4 diem, ...), ...] của lượt OCR cùng
+                    trang - dùng để LOẠI vùng thực chất là khối text (screenshot
+                    câu hỏi bị nham label 'image', terminal output...): bỏ nếu
+                    bị text phủ >= FIGURE_TEXT_COVER_THR diện tích HOẶC chứa
+                    >= FIGURE_TEXT_BOX_MAX text box (khối câu hỏi + đáp án).
 
     Returns:
         list [(y0, marker, rel_path), ...] với y0 = đỉnh vùng figure (pixel),
@@ -254,16 +316,21 @@ def extract_figures(img, fig_dir, page_label, rel_prefix=None, thr=FIGURE_SCORE_
             return []
         if not isinstance(img, Image.Image):
             img = Image.fromarray(img)
-        os.makedirs(fig_dir, exist_ok=True)
         if rel_prefix is None:
             rel_prefix = os.path.basename(os.path.normpath(fig_dir))
 
         markers = []
         # Sắp xếp theo y để đánh số hình từ trên xuống
         for region in sorted(regions, key=lambda r: r["bbox"][1]):
+            if text_boxes and (
+                    _text_coverage(region["bbox"], text_boxes) >= FIGURE_TEXT_COVER_THR
+                    or _count_boxes_inside(region["bbox"], text_boxes) >= FIGURE_TEXT_BOX_MAX):
+                continue  # khối text (screenshot câu hỏi...) - OCR đã xử lý
             fig_img = crop_figure_region(img, region)
             if fig_img.width < FIGURE_MIN_SIZE or fig_img.height < FIGURE_MIN_SIZE:
                 continue
+            # Chỉ tạo thư mục khi thật sự có hình để lưu (tránh thư mục rỗng)
+            os.makedirs(fig_dir, exist_ok=True)
             k = len(markers) + 1
             fname = f"{page_label}_fig{k}.png"
             fig_img.save(os.path.join(fig_dir, fname))

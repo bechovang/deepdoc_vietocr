@@ -247,6 +247,7 @@ Ghi chú:
 - Tính năng **mặc định TẮT** (`--figures` để bật) — `run.bat` và GUI giữ nguyên hành vi cũ; GUI có checkbox "Tách hình (diagram)".
 - Layout pass thêm ~0.5–1.5 s/trang CPU.
 - Chỉ nhận nhãn `figure`/`image`: đã kiểm chứng trên 10 đề thi FuOverflow, các vùng còn lại bị model gán `reference` đều là **logo/watermark template** (lặp lại cùng vị trí mọi trang) chứ không phải exhibit — không tách để tránh sinh PNG rác.
+- **Lọc khối text bị nhầm là hình**: một số format đề (vd nwc204 sp-2025) model gán nhãn `image` cho **nguyên screenshot câu hỏi** (chữ + đáp án + UI). Pipeline dùng kết quả OCR cùng trang để loại các vùng thực chất là khối text: bị text phủ ≥ 45% diện tích hoặc chứa ≥ 12 text box (screenshot câu hỏi: 16–26 box; exhibit thật: 0–8 box chỉ là nhãn thiết bị). Text trong vùng bị loại vẫn được OCR bình thường.
 
 Ngoài ra có thể **chỉ quét báo cáo** trang nào có figure (không OCR, nhanh):
 

@@ -243,6 +243,7 @@ Notes:
 - The feature is **OFF by default** (pass `--figures` to enable) — `run.bat` and the GUI keep their old behavior; the GUI has a "Tách hình (diagram)" checkbox.
 - The layout pass adds ~0.5–1.5 s/page on CPU.
 - Only `figure`/`image` labels are accepted: verified on 10 FuOverflow exam PDFs, every other high-score region (labeled `reference`) is a **recurring template logo/watermark** (same position on every page), not an exhibit — skipping them avoids junk PNGs.
+- **Text blocks mistaken as figures are filtered**: in some exam formats (e.g. nwc204 sp-2025) the model labels the **whole question screenshot** (text + options + UI) as `image`. The pipeline reuses the same page's OCR boxes to drop regions that are really text: covered ≥ 45% by text boxes, or containing ≥ 12 text boxes (question screenshots: 16–26 boxes; real exhibits: 0–8 boxes — just device labels). Text in dropped regions is still OCR-ed normally.
 
 You can also run a **detection-only report** of which pages contain figures (no OCR, fast):
 
